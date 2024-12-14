@@ -22,12 +22,12 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 }
 
 // Set the contents of one cell, 0 indexed
-func (mgr *CSVManager) UpdateCell(xPos, yPos int, value string) error {
-	if xPos < 0 || yPos < 0 || yPos > len(mgr.Contents) || xPos > len(mgr.Contents[0]) {
+func (mgr *CSVManager) UpdateCell(col, row int, value string) error {
+	if col < 0 || row < 0 || row > len(mgr.Contents) || col > len(mgr.Contents[0]) {
 		return fmt.Errorf("x/y out of bounds of Contents")
 	}
 
-	mgr.Contents[yPos][xPos] = value
+	mgr.Contents[row][col] = value
 	return nil
 }
 

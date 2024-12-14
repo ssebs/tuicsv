@@ -39,5 +39,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// fmt.Println("before")
 	fmt.Println(mgr.Contents)
+	// fmt.Println("after")
+
+	// mgr.UpdateCell(0, 3, "Sebastian")
+	// fmt.Println(mgr.Contents)
+
+	// mgr.FullPath, _ = filepath.Abs("./testSAVED.csv")
+	// mgr.Save()
 }
