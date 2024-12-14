@@ -6,6 +6,7 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type CSVManager struct {
@@ -25,8 +26,55 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	return mgr, err
 }
 
-func (mgr *CSVManager) Init() tea.Cmd {
-	return nil
+func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return mgr, tea.Quit
+		case "up", "k":
+			if mgr.Cursor.Row > 0 {
+				mgr.Cursor.Row--
+			}
+		case "down", "j":
+			if mgr.Cursor.Row < len(mgr.Contents)-1 {
+				mgr.Cursor.Row++
+			}
+		case "left", "h":
+			if mgr.Cursor.Col > 0 {
+				mgr.Cursor.Col--
+			}
+		case "right", "l":
+			if mgr.Cursor.Col < len(mgr.Contents[0])-1 {
+				mgr.Cursor.Col++
+			}
+		case "enter":
+			// edit
+
+		}
+	}
+
+	return mgr, nil
+}
+
+func (mgr *CSVManager) View() string {
+	s := ""
+
+	for y := 0; y < len(mgr.Contents); y++ {
+		for x := 0; x < len(mgr.Contents[0]); x++ {
+
+			if mgr.Cursor.Col == x && mgr.Cursor.Row == y {
+				tmp := mgr.Contents[y][x]
+				s += lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render(tmp)
+			} else {
+				s += mgr.Contents[y][x]
+			}
+		}
+		s += "\n"
+	}
+
+	s += "ctrl+c to quit"
+	return s
 }
 
 // Set the contents of one cell by a 0 indexed CellPosition
@@ -67,6 +115,10 @@ func (mgr *CSVManager) Load() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse csv, %s", err)
 	}
+	return nil
+}
+
+func (mgr *CSVManager) Init() tea.Cmd {
 	return nil
 }
 

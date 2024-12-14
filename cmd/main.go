@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 
+	tea "github.com/charmbracelet/bubbletea"
 	flag "github.com/spf13/pflag"
 	"github.com/ssebs/tuicsv/internal"
 )
@@ -39,15 +41,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// tea.NewProgram()
-
-	// fmt.Println("before")
-	fmt.Println(mgr.Contents)
-	// fmt.Println("after")
-
-	// mgr.UpdateCell(0, 3, "Sebastian")
-	// fmt.Println(mgr.Contents)
-
-	// mgr.FullPath, _ = filepath.Abs("./testSAVED.csv")
-	// mgr.Save()
+	p := tea.NewProgram(mgr)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
 }
