@@ -39,6 +39,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// tea.NewProgram()
+
 	// fmt.Println("before")
 	fmt.Println(mgr.Contents)
 	// fmt.Println("after")

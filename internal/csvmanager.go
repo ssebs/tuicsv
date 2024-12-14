@@ -4,30 +4,38 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type CSVManager struct {
 	FullPath string
 	Contents [][]string
+	Cursor   *CellPosition
 }
 
 // Creates mgr and loads from fullPath
 func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
 		FullPath: fullPath,
+		Cursor:   &CellPosition{0, 0},
 	}
 
 	err = mgr.Load()
 	return mgr, err
 }
 
-// Set the contents of one cell, 0 indexed
-func (mgr *CSVManager) UpdateCell(col, row int, value string) error {
-	if col < 0 || row < 0 || row > len(mgr.Contents) || col > len(mgr.Contents[0]) {
+func (mgr *CSVManager) Init() tea.Cmd {
+	return nil
+}
+
+// Set the contents of one cell by a 0 indexed CellPosition
+func (mgr *CSVManager) UpdateCell(pos *CellPosition, value string) error {
+	if pos.Col < 0 || pos.Row < 0 || pos.Row > len(mgr.Contents) || pos.Col > len(mgr.Contents[0]) {
 		return fmt.Errorf("x/y out of bounds of Contents")
 	}
 
-	mgr.Contents[row][col] = value
+	mgr.Contents[pos.Row][pos.Col] = value
 	return nil
 }
 
@@ -60,4 +68,9 @@ func (mgr *CSVManager) Load() error {
 		return fmt.Errorf("failed to parse csv, %s", err)
 	}
 	return nil
+}
+
+type CellPosition struct {
+	Row int
+	Col int
 }
