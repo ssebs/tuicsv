@@ -4,15 +4,17 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/evertras/bubble-table/table"
 )
 
 type CSVManager struct {
 	FullPath string
 	Contents [][]string
 	Cursor   *CellPosition
+	table    table.Model
 }
 
 // Creates mgr and loads from fullPath
@@ -20,9 +22,35 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
 		FullPath: fullPath,
 		Cursor:   &CellPosition{0, 0},
+		table:    table.New(nil),
 	}
 
 	err = mgr.Load()
+	if err != nil {
+		return mgr, err
+	}
+
+	cols := make([]table.Column, 0, len(mgr.Contents))
+	rows := make([]table.Row, 0, len(mgr.Contents[0]))
+	for idx, row := range mgr.Contents {
+		// Set columns
+		if idx == 0 {
+			for _, col := range row {
+				cols = append(cols, table.NewFlexColumn(strings.TrimSpace(col), col, 1))
+			}
+			continue
+		}
+
+		// Set rows
+		rowData := table.RowData{}
+		for j, cellData := range row {
+			rowData[cols[j].Key()] = cellData
+		}
+		rows = append(rows, table.NewRow(rowData))
+	}
+
+	mgr.table = mgr.table.WithColumns(cols).WithRows(rows).BorderRounded()
+
 	return mgr, err
 }
 
@@ -52,29 +80,33 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// edit
 
 		}
+	case tea.WindowSizeMsg:
+		mgr.table.WithTargetWidth(80)
 	}
 
 	return mgr, nil
 }
 
 func (mgr *CSVManager) View() string {
-	s := ""
+	s := strings.Builder{}
 
-	for y := 0; y < len(mgr.Contents); y++ {
-		for x := 0; x < len(mgr.Contents[0]); x++ {
+	s.WriteString(mgr.table.View())
 
-			if mgr.Cursor.Col == x && mgr.Cursor.Row == y {
-				tmp := mgr.Contents[y][x]
-				s += lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render(tmp)
-			} else {
-				s += mgr.Contents[y][x]
-			}
-		}
-		s += "\n"
-	}
+	// for y := 0; y < len(mgr.Contents); y++ {
+	// 	for x := 0; x < len(mgr.Contents[0]); x++ {
 
-	s += "ctrl+c to quit"
-	return s
+	// 		if mgr.Cursor.Col == x && mgr.Cursor.Row == y {
+	// 			tmp := mgr.Contents[y][x]
+	// 			s += lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render(tmp)
+	// 		} else {
+	// 			s += mgr.Contents[y][x]
+	// 		}
+	// 	}
+	// 	s += "\n"
+	// }
+
+	s.WriteString("\nctrl+c to quit")
+	return s.String()
 }
 
 // Set the contents of one cell by a 0 indexed CellPosition
