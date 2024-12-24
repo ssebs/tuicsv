@@ -7,12 +7,11 @@ Text User Interface CSV Editor. Edit CSV files in your terminal.
 - [x] Load csv file
 - [x] Save csv file
 - [x] Update csv file
-- [ ] Render table
-  - https://github.com/charmbracelet/bubbletea/blob/master/examples/table/main.go
+- [x] Render table
 - [ ] Scroll + scrollbars
 - [ ] Edit cell
 - [ ] footer showing status
-- [ ] unit tests
+- [ ] tests
 - Shortcuts:
   - [x] hjkl + arrow key navigation
     - [ ] + ctrl to go to end of sheet
