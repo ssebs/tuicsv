@@ -4,29 +4,86 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"strings"
+	"unicode"
 
+	"github.com/76creates/stickers/flexbox"
+	"github.com/76creates/stickers/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 type CSVManager struct {
-	FullPath string
-	Contents [][]string
-	Cursor   *CellPosition
+	FullPath      string
+	Contents      [][]string
+	table         *table.TableSingleType[string]
+	infoBox       *flexbox.FlexBox
+	headers       []string
+	selectedValue string
 }
 
 // Creates mgr and loads from fullPath
 func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
-		FullPath: fullPath,
-		Cursor:   &CellPosition{0, 0},
+		FullPath:      fullPath,
+		infoBox:       flexbox.New(0, 0).SetHeight(7),
+		selectedValue: "\nselect something with spacebar or enter",
 	}
 
 	err = mgr.Load()
 	if err != nil {
 		return mgr, err
 	}
+
+	mgr.headers = mgr.Contents[0]
+	mgr.table = table.NewTableSingleType[string](0, 0, mgr.headers)
+	mgr.table.SetStylePassing(true)
+
+	mgr.table.SetStyles(map[table.TableStyleKey]lipgloss.Style{
+		table.TableHeaderStyleKey: lipgloss.NewStyle().
+			Background(lipgloss.Color("#024b8a")).
+			Foreground(lipgloss.Color("#fff")),
+		table.TableFooterStyleKey: lipgloss.NewStyle().
+			// Background(lipgloss.Color("#222")).
+			Foreground(lipgloss.Color("#fff")).Align(lipgloss.Right).Height(1),
+		table.TableRowsStyleKey: lipgloss.NewStyle().
+			// Background(lipgloss.Color("#222")).
+			Foreground(lipgloss.Color("#fff")),
+		table.TableRowsSubsequentStyleKey: lipgloss.NewStyle().
+			// Background(lipgloss.Color("#444")).
+			Foreground(lipgloss.Color("#fff")),
+		table.TableRowsCursorStyleKey: lipgloss.NewStyle().
+			// Background(lipgloss.Color("#333")).
+			Foreground(lipgloss.Color("#fff")),
+		table.TableCellCursorStyleKey: lipgloss.NewStyle().
+			Background(lipgloss.Color("#024b8a")).
+			Foreground(lipgloss.Color("#fff")).
+			Bold(true),
+	})
+
+	// setup
+	// mgr.table.SetRatio([]int{1, 10, 10, 5, 10}).SetMinWidth([]int{4, 5, 5, 2, 5})
+	// add rows
+	mgr.table.AddRows(mgr.Contents[1:])
+
+	// setup info box
+	infoText := `
+use the arrows to navigate
+ctrl+s: sort by current column
+alphanumerics: filter column
+enter, spacebar: get column value
+ctrl+c: quit
+`
+	r1 := mgr.infoBox.NewRow()
+	r1.AddCells(
+		flexbox.NewCell(1, 1).
+			SetID("info").
+			SetContent(infoText),
+		flexbox.NewCell(1, 1).
+			SetID("info").
+			SetContent(mgr.selectedValue).
+			SetStyle(lipgloss.NewStyle().Bold(true)),
+	)
+	mgr.infoBox.AddRows([]*flexbox.Row{r1})
 
 	return mgr, err
 }
@@ -36,59 +93,65 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			if mgr.Cursor.Row > 0 {
-				mgr.Cursor.Row--
-			}
+			mgr.table.CursorUp()
 		case "down", "j":
-			if mgr.Cursor.Row < len(mgr.Contents)-1 {
-				mgr.Cursor.Row++
-			}
+			mgr.table.CursorDown()
 		case "left", "h":
-			if mgr.Cursor.Col > 0 {
-				mgr.Cursor.Col--
-			}
+			mgr.table.CursorLeft()
 		case "right", "l":
-			if mgr.Cursor.Col < len(mgr.Contents[0])-1 {
-				mgr.Cursor.Col++
-			}
+			mgr.table.CursorRight()
 		case "ctrl+c":
 			return mgr, tea.Quit
-		case "enter":
-			// edit
-			fmt.Println("cursor:", mgr.Cursor)
+		case "ctrl+s":
+			x, _ := mgr.table.GetCursorLocation()
+			mgr.table.OrderByColumn(x)
+		case "enter", " ":
+			mgr.selectedValue = mgr.table.GetCursorValue()
+			mgr.infoBox.GetRow(0).GetCell(1).SetContent("\nselected cell: " + mgr.selectedValue)
+		case "backspace":
+			mgr.filterWithStr(msg.String())
+		default:
+			if len(msg.String()) == 1 {
+				r := msg.Runes[0]
+				if unicode.IsLetter(r) || unicode.IsDigit(r) {
+					mgr.filterWithStr(msg.String())
+				}
+			}
+
 		}
 	case tea.WindowSizeMsg:
-		fmt.Println("implement resize")
+		mgr.table.SetWidth(msg.Width)
+		mgr.table.SetHeight(msg.Height - mgr.infoBox.GetHeight())
+		mgr.infoBox.SetWidth(msg.Width)
 	}
 
 	return mgr, nil
 }
 
 func (mgr *CSVManager) View() string {
-	s := strings.Builder{}
+	return lipgloss.JoinVertical(lipgloss.Left, mgr.table.Render(), mgr.infoBox.Render())
+}
 
-	for y := 0; y < len(mgr.Contents); y++ {
-		for x := 0; x < len(mgr.Contents[0]); x++ {
-
-			cellContent := ""
-			if mgr.Cursor.Col == x && mgr.Cursor.Row == y {
-				// s.WriteString(lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Foreground(lipgloss.Color("12")).Render(cellContent))
-				// s.WriteString(cellContent)
-				cellContent = lipgloss.NewStyle().Padding(1, 1, 1, 1).Render(mgr.Contents[y][x])
-			} else {
-				cellContent = lipgloss.NewStyle().Padding(1, 1, 1, 1).Render(mgr.Contents[y][x])
-			}
-			// TODO: FIGURE OUT WHY ADDING PADDING BREAKS NEWLINES
-			if strings.Contains(cellContent, "\n") {
-				fmt.Println(cellContent)
-			}
-			s.WriteString(cellContent)
-		}
-		s.WriteString("\n")
+func (m *CSVManager) filterWithStr(key string) {
+	i, s := m.table.GetFilter()
+	x, _ := m.table.GetCursorLocation()
+	if x != i && key != "backspace" {
+		m.table.SetFilter(x, key)
+		return
 	}
-
-	s.WriteString("\nctrl+c to quit")
-	return s.String()
+	if key == "backspace" {
+		if len(s) == 1 {
+			m.table.UnsetFilter()
+			return
+		} else if len(s) > 1 {
+			s = s[0 : len(s)-1]
+		} else {
+			return
+		}
+	} else {
+		s = s + key
+	}
+	m.table.SetFilter(i, s)
 }
 
 // Set the contents of one cell by a 0 indexed CellPosition
