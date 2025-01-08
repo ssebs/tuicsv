@@ -25,8 +25,8 @@ type CSVManager struct {
 func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
 		FullPath:      fullPath,
-		infoBox:       flexbox.New(0, 0).SetHeight(7),
-		selectedValue: "\nselect something with spacebar or enter",
+		infoBox:       flexbox.New(0, 7),
+		selectedValue: "\nSelect something with Enter",
 	}
 
 	err = mgr.Load()
@@ -34,6 +34,7 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 		return mgr, err
 	}
 
+	// TODO: move headers and contents
 	mgr.headers = mgr.Contents[0]
 	mgr.table = table.NewTableSingleType[string](0, 0, mgr.headers)
 	mgr.table.SetStylePassing(true)
@@ -60,27 +61,27 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 			Bold(true),
 	})
 
-	// setup
-	// mgr.table.SetRatio([]int{1, 10, 10, 5, 10}).SetMinWidth([]int{4, 5, 5, 2, 5})
-	// add rows
 	mgr.table.AddRows(mgr.Contents[1:])
 
 	// setup info box
 	infoText := `
 use the arrows to navigate
-ctrl+s: sort by current column
+ctrl+f: sort by current column
 alphanumerics: filter column
 enter, spacebar: get column value
 ctrl+c: quit
 `
+
 	r1 := mgr.infoBox.NewRow()
 	r1.AddCells(
 		flexbox.NewCell(1, 1).
 			SetID("info").
-			SetContent(infoText),
+			SetContent(
+				lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Render(infoText),
+			),
 		flexbox.NewCell(1, 1).
 			SetID("info").
-			SetContent(mgr.selectedValue).
+			SetContent(lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Render(mgr.selectedValue)).
 			SetStyle(lipgloss.NewStyle().Bold(true)),
 	)
 	mgr.infoBox.AddRows([]*flexbox.Row{r1})
@@ -102,7 +103,7 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			mgr.table.CursorRight()
 		case "ctrl+c":
 			return mgr, tea.Quit
-		case "ctrl+s":
+		case "ctrl+f":
 			x, _ := mgr.table.GetCursorLocation()
 			mgr.table.OrderByColumn(x)
 		case "enter", " ":
@@ -129,7 +130,7 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (mgr *CSVManager) View() string {
-	return lipgloss.JoinVertical(lipgloss.Left, mgr.table.Render(), mgr.infoBox.Render())
+	return lipgloss.JoinVertical(lipgloss.Top, mgr.table.Render(), mgr.infoBox.Render())
 }
 
 func (m *CSVManager) filterWithStr(key string) {

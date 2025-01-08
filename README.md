@@ -8,7 +8,7 @@ Text User Interface CSV Editor. Edit CSV files in your terminal.
 - [x] Save csv file
 - [x] Update csv file
 - [x] Render table
-- [ ] Scroll + scrollbars
+- [x] Scroll + scrollbars
 - [ ] Edit cell
 - [ ] footer showing status
 - [ ] tests
