@@ -13,8 +13,9 @@ import (
 )
 
 type CSVManager struct {
-	FullPath      string
-	Contents      [][]string
+	fullPath      string
+	contents      [][]string
+	container     *flexbox.FlexBox
 	table         *table.TableSingleType[string]
 	infoBox       *flexbox.FlexBox
 	headers       []string
@@ -24,9 +25,10 @@ type CSVManager struct {
 // Creates mgr and loads from fullPath
 func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
-		FullPath:      fullPath,
+		fullPath:      fullPath,
 		infoBox:       flexbox.New(0, 7),
 		selectedValue: "\nSelect something with Enter",
+		container:     flexbox.New(0, 3),
 	}
 
 	err = mgr.Load()
@@ -35,7 +37,7 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	}
 
 	// TODO: move headers and contents
-	mgr.headers = mgr.Contents[0]
+	mgr.headers = mgr.contents[0]
 	mgr.table = table.NewTableSingleType[string](0, 0, mgr.headers)
 	mgr.table.SetStylePassing(true)
 
@@ -61,7 +63,7 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 			Bold(true),
 	})
 
-	mgr.table.AddRows(mgr.Contents[1:])
+	mgr.table.AddRows(mgr.contents[1:])
 
 	// setup info box
 	infoText := `
@@ -72,15 +74,14 @@ enter, spacebar: get column value
 ctrl+c: quit
 `
 
-	r1 := mgr.infoBox.NewRow()
-	r1.AddCells(
+	r1 := mgr.infoBox.NewRow().AddCells(
 		flexbox.NewCell(1, 1).
 			SetID("info").
 			SetContent(
 				lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Render(infoText),
 			),
 		flexbox.NewCell(1, 1).
-			SetID("info").
+			SetID("val").
 			SetContent(lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Render(mgr.selectedValue)).
 			SetStyle(lipgloss.NewStyle().Bold(true)),
 	)
@@ -158,17 +159,17 @@ func (m *CSVManager) filterWithStr(key string) {
 // Set the contents of one cell by a 0 indexed CellPosition
 // err if out of bounds
 func (mgr *CSVManager) SetCell(pos *CellPosition, value string) error {
-	if pos.Col < 0 || pos.Row < 0 || pos.Row > len(mgr.Contents) || pos.Col > len(mgr.Contents[0]) {
+	if pos.Col < 0 || pos.Row < 0 || pos.Row > len(mgr.contents) || pos.Col > len(mgr.contents[0]) {
 		return fmt.Errorf("x/y out of bounds of Contents")
 	}
 
-	mgr.Contents[pos.Row][pos.Col] = value
+	mgr.contents[pos.Row][pos.Col] = value
 	return nil
 }
 
 // Save csv mgr.Contents to mgr.FullPath
 func (mgr *CSVManager) Save() error {
-	f, err := os.Create(mgr.FullPath)
+	f, err := os.Create(mgr.fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to open csv, %s", err)
 	}
@@ -176,7 +177,7 @@ func (mgr *CSVManager) Save() error {
 
 	w := csv.NewWriter(f)
 
-	if err := w.WriteAll(mgr.Contents); err != nil {
+	if err := w.WriteAll(mgr.contents); err != nil {
 		return fmt.Errorf("failed to write fiale, %s", err)
 	}
 	return nil
@@ -184,7 +185,7 @@ func (mgr *CSVManager) Save() error {
 
 // Load from mgr.FullPath to csv mgr.Contents
 func (mgr *CSVManager) Load() error {
-	f, err := os.Open(mgr.FullPath)
+	f, err := os.Open(mgr.fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to open csv, %s", err)
 	}
@@ -192,7 +193,7 @@ func (mgr *CSVManager) Load() error {
 
 	r := csv.NewReader(f)
 
-	mgr.Contents, err = r.ReadAll()
+	mgr.contents, err = r.ReadAll()
 	if err != nil {
 		return fmt.Errorf("failed to parse csv, %s", err)
 	}
