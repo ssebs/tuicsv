@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"strings"
 	"unicode"
 
 	"github.com/76creates/stickers/flexbox"
@@ -20,15 +21,23 @@ type CSVManager struct {
 	infoBox       *flexbox.FlexBox
 	headers       []string
 	selectedValue string
+	filterTxt     string
 }
+
+const infoText = `Use the arrows to navigate
+Type to filter column
+Enter, spacebar: get column value
+Ctrl+C: quit
+`
 
 // Creates mgr and loads from fullPath
 func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
 		fullPath:      fullPath,
-		infoBox:       flexbox.New(0, 7),
-		selectedValue: "\nSelect something with Enter",
-		container:     flexbox.New(0, 3),
+		infoBox:       flexbox.New(0, len(strings.Split(infoText, "\n"))),
+		selectedValue: "Select something with Enter",
+		filterTxt:     "",
+		// container:     flexbox.New(0, 7),
 	}
 
 	err = mgr.Load()
@@ -65,27 +74,18 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 
 	mgr.table.AddRows(mgr.contents[1:])
 
-	// setup info box
-	infoText := `
-use the arrows to navigate
-ctrl+f: sort by current column
-alphanumerics: filter column
-enter, spacebar: get column value
-ctrl+c: quit
-`
-
-	r1 := mgr.infoBox.NewRow().AddCells(
-		flexbox.NewCell(1, 1).
-			SetID("info").
-			SetContent(
-				lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Render(infoText),
-			),
-		flexbox.NewCell(1, 1).
-			SetID("val").
-			SetContent(lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Render(mgr.selectedValue)).
-			SetStyle(lipgloss.NewStyle().Bold(true)),
-	)
-	mgr.infoBox.AddRows([]*flexbox.Row{r1})
+	mgr.infoBox.AddRows([]*flexbox.Row{
+		mgr.infoBox.NewRow().AddCells(
+			flexbox.NewCell(1, 1).
+				SetID("info").
+				SetContent(infoText).
+				SetStyle(lipgloss.NewStyle().PaddingLeft(1)),
+			flexbox.NewCell(2, 1).
+				SetID("val").
+				SetContent(mgr.selectedValue).
+				SetStyle(lipgloss.NewStyle().Bold(true)),
+		).SetStyle(lipgloss.NewStyle().Border(lipgloss.NormalBorder())),
+	})
 
 	return mgr, err
 }
@@ -104,12 +104,11 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			mgr.table.CursorRight()
 		case "ctrl+c":
 			return mgr, tea.Quit
-		case "ctrl+f":
-			x, _ := mgr.table.GetCursorLocation()
-			mgr.table.OrderByColumn(x)
 		case "enter", " ":
-			mgr.selectedValue = mgr.table.GetCursorValue()
-			mgr.infoBox.GetRow(0).GetCell(1).SetContent("\nselected cell: " + mgr.selectedValue)
+			// switch mode to edit
+
+			mgr.selectedValue = "Selected: " + mgr.table.GetCursorValue()
+			mgr.infoBox.GetRow(0).GetCell(1).SetContent(mgr.selectedValue + mgr.filterTxt)
 		case "backspace":
 			mgr.filterWithStr(msg.String())
 		default:
