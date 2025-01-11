@@ -9,6 +9,7 @@ import (
 
 	"github.com/76creates/stickers/flexbox"
 	"github.com/76creates/stickers/table"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -21,7 +22,8 @@ type CSVManager struct {
 	infoBox       *flexbox.FlexBox
 	headers       []string
 	selectedValue string
-	filterTxt     string
+	textInput     textinput.Model
+	mode          TUIMode
 }
 
 const infoText = `Use the arrows to navigate
@@ -36,7 +38,8 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 		fullPath:      fullPath,
 		infoBox:       flexbox.New(0, len(strings.Split(infoText, "\n"))),
 		selectedValue: "Select something with Enter",
-		filterTxt:     "",
+		textInput:     textinput.New(),
+		mode:          MODE_NORMAL,
 		// container:     flexbox.New(0, 7),
 	}
 
@@ -91,6 +94,10 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 }
 
 func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	selectedField := mgr.infoBox.GetRow(0).GetCell(1)
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -104,33 +111,66 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			mgr.table.CursorRight()
 		case "ctrl+c":
 			return mgr, tea.Quit
+		case "escape":
+			mgr.mode = MODE_NORMAL
 		case "enter", " ":
-			// switch mode to edit
+			if mgr.mode == MODE_NORMAL {
+				mgr.selectedValue = "Selected: " + mgr.table.GetCursorValue()
+				selectedField.SetContent(mgr.selectedValue)
 
-			mgr.selectedValue = "Selected: " + mgr.table.GetCursorValue()
-			mgr.infoBox.GetRow(0).GetCell(1).SetContent(mgr.selectedValue + mgr.filterTxt)
+				mgr.mode = MODE_EDIT
+				cmd = mgr.textInput.Focus()
+				mgr.textInput.SetValue(mgr.table.GetCursorValue())
+			} else {
+				mgr.mode = MODE_NORMAL
+				selectedField.SetContent(mgr.textInput.Value())
+
+				x, y := mgr.table.GetCursorLocation()
+				mgr.SetCell(NewCellPosition(y+1, x), mgr.textInput.Value())
+
+				// Create a [][]any slice
+				anySlice := make([][]any, len(mgr.contents[1:]))
+
+				// Convert each []string to []any
+				for i, inner := range mgr.contents[1:] {
+					anyInner := make([]any, len(inner))
+					for j, val := range inner {
+						anyInner[j] = val
+					}
+					anySlice[i] = anyInner
+				}
+
+				mgr.table.ClearRows().AddRows(anySlice)
+			}
 		case "backspace":
-			mgr.filterWithStr(msg.String())
+			if mgr.mode == MODE_NORMAL {
+				mgr.filterWithStr(msg.String())
+			}
 		default:
-			if len(msg.String()) == 1 {
-				r := msg.Runes[0]
-				if unicode.IsLetter(r) || unicode.IsDigit(r) {
-					mgr.filterWithStr(msg.String())
+			if mgr.mode == MODE_NORMAL {
+				if len(msg.String()) == 1 {
+					r := msg.Runes[0]
+					if unicode.IsLetter(r) || unicode.IsDigit(r) {
+						mgr.filterWithStr(msg.String())
+					}
 				}
 			}
-
 		}
 	case tea.WindowSizeMsg:
 		mgr.table.SetWidth(msg.Width)
 		mgr.table.SetHeight(msg.Height - mgr.infoBox.GetHeight())
 		mgr.infoBox.SetWidth(msg.Width)
 	}
-
-	return mgr, nil
+	mgr.textInput, cmd = mgr.textInput.Update(msg)
+	return mgr, cmd
 }
 
 func (mgr *CSVManager) View() string {
-	return lipgloss.JoinVertical(lipgloss.Top, mgr.table.Render(), mgr.infoBox.Render())
+	if mgr.mode == MODE_NORMAL {
+		return lipgloss.JoinVertical(lipgloss.Top, mgr.table.Render(), mgr.infoBox.Render())
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Top, mgr.textInput.View(), mgr.infoBox.Render())
 }
 
 func (m *CSVManager) filterWithStr(key string) {
@@ -157,7 +197,7 @@ func (m *CSVManager) filterWithStr(key string) {
 
 // Set the contents of one cell by a 0 indexed CellPosition
 // err if out of bounds
-func (mgr *CSVManager) SetCell(pos *CellPosition, value string) error {
+func (mgr *CSVManager) SetCell(pos CellPosition, value string) error {
 	if pos.Col < 0 || pos.Row < 0 || pos.Row > len(mgr.contents) || pos.Col > len(mgr.contents[0]) {
 		return fmt.Errorf("x/y out of bounds of Contents")
 	}
@@ -200,7 +240,7 @@ func (mgr *CSVManager) Load() error {
 }
 
 func (mgr *CSVManager) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 // 0 indexed
@@ -208,3 +248,17 @@ type CellPosition struct {
 	Row int
 	Col int
 }
+
+func NewCellPosition(row int, col int) CellPosition {
+	return CellPosition{
+		Row: row,
+		Col: col,
+	}
+}
+
+type TUIMode int
+
+const (
+	MODE_NORMAL TUIMode = iota
+	MODE_EDIT
+)
