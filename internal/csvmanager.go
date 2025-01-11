@@ -28,8 +28,8 @@ type CSVManager struct {
 
 const infoText = `Use the arrows to navigate
 Type to filter column
-Enter, spacebar: get column value
-Ctrl+C: quit
+Enter to edit selected cell
+Ctrl+C to quit
 `
 
 // Creates mgr and loads from fullPath
@@ -37,10 +37,9 @@ func NewCSVManager(fullPath string) (mgr *CSVManager, err error) {
 	mgr = &CSVManager{
 		fullPath:      fullPath,
 		infoBox:       flexbox.New(0, len(strings.Split(infoText, "\n"))),
-		selectedValue: "Select something with Enter",
+		selectedValue: "",
 		textInput:     textinput.New(),
 		mode:          MODE_NORMAL,
-		// container:     flexbox.New(0, 7),
 	}
 
 	err = mgr.Load()
@@ -115,15 +114,20 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			mgr.mode = MODE_NORMAL
 		case "enter", " ":
 			if mgr.mode == MODE_NORMAL {
-				mgr.selectedValue = "Selected: " + mgr.table.GetCursorValue()
-				selectedField.SetContent(mgr.selectedValue)
-
 				mgr.mode = MODE_EDIT
+
 				cmd = mgr.textInput.Focus()
+
 				mgr.textInput.SetValue(mgr.table.GetCursorValue())
+				mgr.textInput.Prompt = "Edit: "
+				mgr.textInput.CursorEnd()
+
+				selectedField.SetContent(mgr.textInput.View())
 			} else {
 				mgr.mode = MODE_NORMAL
-				selectedField.SetContent(mgr.textInput.Value())
+
+				selectedField.SetContent("")
+				mgr.textInput.Blur()
 
 				x, y := mgr.table.GetCursorLocation()
 				mgr.SetCell(NewCellPosition(y+1, x), mgr.textInput.Value())
@@ -145,6 +149,9 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "backspace":
 			if mgr.mode == MODE_NORMAL {
 				mgr.filterWithStr(msg.String())
+			} else {
+				mgr.textInput, cmd = mgr.textInput.Update(msg)
+				selectedField.SetContent(mgr.textInput.View())
 			}
 		default:
 			if mgr.mode == MODE_NORMAL {
@@ -154,14 +161,17 @@ func (mgr *CSVManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						mgr.filterWithStr(msg.String())
 					}
 				}
+			} else {
+				mgr.textInput, cmd = mgr.textInput.Update(msg)
+				selectedField.SetContent(mgr.textInput.View())
 			}
+
 		}
 	case tea.WindowSizeMsg:
 		mgr.table.SetWidth(msg.Width)
 		mgr.table.SetHeight(msg.Height - mgr.infoBox.GetHeight())
 		mgr.infoBox.SetWidth(msg.Width)
 	}
-	mgr.textInput, cmd = mgr.textInput.Update(msg)
 	return mgr, cmd
 }
 
@@ -170,7 +180,8 @@ func (mgr *CSVManager) View() string {
 		return lipgloss.JoinVertical(lipgloss.Top, mgr.table.Render(), mgr.infoBox.Render())
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Top, mgr.textInput.View(), mgr.infoBox.Render())
+	return lipgloss.JoinVertical(lipgloss.Top, mgr.table.Render(), mgr.infoBox.Render())
+	// return lipgloss.JoinVertical(lipgloss.Top, mgr.textInput.View(), mgr.table.Render(), mgr.infoBox.Render())
 }
 
 func (m *CSVManager) filterWithStr(key string) {
