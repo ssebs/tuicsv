@@ -247,7 +247,21 @@ func (mgr *CSVManager) Load() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse csv, %s", err)
 	}
+
+	mgr.padCSV()
+
 	return nil
+}
+
+func (mgr *CSVManager) padCSV() {
+	fillLimit := 100
+
+	if len(mgr.contents) < 100 {
+		for idx := len(mgr.contents); idx <= fillLimit; idx++ {
+			mgr.contents = append(mgr.contents, make([]string, 1))
+		}
+	}
+
 }
 
 func (mgr *CSVManager) Init() tea.Cmd {
